@@ -1667,9 +1667,9 @@ class Stage extends DisplayObjectContainer implements IModule {
 					event.bubbles = false;
 					__dispatchTarget (target, event);
 					
-				}
-				
-				if (target.hasEventListener (MouseEvent.ROLL_OUT)) {
+					__rollOutStack.push (target);
+					
+				} else if (target.hasEventListener (MouseEvent.ROLL_OUT)) {
 					
 					__rollOutStack.push (target);
 					
