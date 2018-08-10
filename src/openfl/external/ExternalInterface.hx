@@ -17,7 +17,7 @@ import openfl._internal.Lib;
 	
 	public static var available (default, null) = #if (js && html5) true #else false #end;
 	public static var marshallExceptions = false;
-	public static var objectID (default, null):String;
+	public static var objectID (get, null):String;
 	
 	
 	public static function addCallback (functionName:String, closure:Dynamic):Void {
@@ -102,6 +102,28 @@ import openfl._internal.Lib;
 		#else
 		return null;
 		#end
+		
+	}
+	
+	private static function get_objectID ():String {
+		
+		#if (js && html5)
+		#if (lime >= "7.0.0")
+		if (Lib.application.window.__backend.element != null) {
+			
+			return Lib.application.window.__backend.element.id;
+			
+		}
+		#else
+		if (Lib.application.window.backend.element != null) {
+			
+			return Lib.application.window.backend.element.id;
+			
+		}
+		#end
+		#end
+		
+		return null;
 		
 	}
 	
