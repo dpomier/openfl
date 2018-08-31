@@ -1072,10 +1072,32 @@ class Stage extends DisplayObjectContainer implements IModule {
 			case CANVAS:
 				
 				#if (js && html5)
+				
+				#if !patch_context3d
+				
 				__renderer = new CanvasRenderer (window.context.canvas2D);
-				cast (__renderer, CanvasRenderer).pixelRatio = pixelRatio;
+				
+				#else
+				
+				__renderer = new CanvasGLHybridRenderer (context);
+				
+				if (stage3Ds[0].context3D == null) {
+					
+					stage3Ds[0].__createContext (this, __renderer);
+					
+					cast(__renderer, CanvasGLHybridRenderer).renderer3d.__allowSmoothing = (quality != LOW);
+					cast(__renderer, CanvasGLHybridRenderer).renderer3d.__worldTransform = __displayMatrix;
+					cast(__renderer, CanvasGLHybridRenderer).renderer3d.__stage = this;
+				}
+				else
+					cast(__renderer, CanvasGLHybridRenderer).renderer3d = untyped stage3Ds[0].__renderer3d;
+				
 				#end
-			
+				
+				cast (__renderer, CanvasRenderer).pixelRatio = pixelRatio;
+				
+				#end
+				
 			case DOM:
 				
 				#if (js && html5)
@@ -2465,6 +2487,10 @@ class Stage extends DisplayObjectContainer implements IModule {
 			
 			__renderer.__allowSmoothing = (quality != LOW);
 			
+			#if patch_context3d
+			if(Std.is(__renderer, CanvasGLHybridRenderer))
+				cast(__renderer, CanvasGLHybridRenderer).renderer3d.__allowSmoothing = (quality != LOW);
+			#end
 		}
 		
 		return value;

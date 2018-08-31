@@ -57,6 +57,12 @@ class Stage3D extends EventDispatcher {
 	private var __renderContext:#if (lime >= "7.0.0") RenderContext #else GLRenderContext #end;
 	private var __style:CSSStyleDeclaration;
 	private var __webgl:RenderingContext;
+	
+	#if patch_context3d
+	private var __renderer3d:OpenGLRenderer; // fallback for canvas
+	private var __canvasResizeMethod:Void->Void;
+	#end
+	
 	#end
 	
 	
@@ -105,6 +111,15 @@ class Stage3D extends EventDispatcher {
 	
 	
 	private function __createContext (stage:Stage, renderer:DisplayObjectRenderer):Void {
+		
+		#if patch_context3d
+		
+		if (__stage == null)
+		{
+			stage.addEventListener(Event.RESIZE, onStageResized);
+		}
+		
+		#end
 		
 		__stage = stage;
 		
@@ -181,9 +196,144 @@ class Stage3D extends EventDispatcher {
 			
 			#end
 			
+		} else if (renderer.__type == CANVAS) {
+			
+			#if (js && html5 && patch_context3d)
+			
+			if (__canvas == null)
+			{
+				if (!createFallbackGLCanvas())
+					return;
+			}
+			
+			__canvas.width = stage.stageWidth;
+			__canvas.height = stage.stageHeight;
+			__renderContext = cast GL.context;
+			
+			__renderer3d = new OpenGLRenderer(__renderContext);
+			cast(renderer, CanvasGLHybridRenderer).renderer3d = __renderer3d;
+			cast(renderer, CanvasGLHybridRenderer).canvasResizeMethod = adjustCanvas3dTransforms;
+			
+			context3D = new Context3D (this, __renderer3d);
+			__dispatchCreate ();
+			
+			#end
 		}
 		
 	}
+	
+	#if (html5 && patch_context3d)
+	
+	@:access(lime.ui.Window)
+	@:access(lime._backend.html5.HTML5Window)
+	private function createFallbackGLCanvas():Bool
+	{
+		// retrieve context (with logic from HTML5Renderer)
+		var webgl:RenderingContext = null;
+		
+		var window = __stage.window;
+		var renderType = window.backend.renderType;
+		var forceCanvas = #if (canvas || munit) true #else (renderType == "canvas") #end;
+		var forceWebGL = #if webgl true #else (renderType == "opengl" || renderType == "webgl" || renderType == "webgl1" || renderType == "webgl2") #end;
+		var allowWebGL2 = #if webgl1 false #else (renderType != "webgl1") #end;
+		
+		var transparentBackground = Reflect.hasField (window.config, "background") && window.config.background == null;
+		var colorDepth = Reflect.hasField (window.config, "colorDepth") ? window.config.colorDepth : 16;
+		
+		var options = {
+			
+			alpha: (transparentBackground || colorDepth > 16) ? true : false,
+			antialias: Reflect.hasField (window.config, "antialiasing") ? window.config.antialiasing > 0 : false,
+			depth: Reflect.hasField (window.config, "depthBuffer") ? window.config.depthBuffer : true,
+			premultipliedAlpha: true,
+			stencil: Reflect.hasField (window.config, "stencilBuffer") ? window.config.stencilBuffer : false,
+			preserveDrawingBuffer: false
+			
+		};
+		
+		var canvas:CanvasElement = cast Browser.document.createElement ("canvas");
+		webgl = cast canvas.getContextWebGL (options);
+		
+		/*
+		var glContextType = [ "webgl", "experimental-webgl" ];
+		
+		if (allowWebGL2) {
+			
+			glContextType.unshift ("webgl2");
+			
+		}
+		
+		for (name in glContextType) {
+			
+			webgl = cast canvas.getContext (name, options);
+			
+			if (webgl != null) break;
+			
+		}
+		*/
+		
+		if (webgl == null)
+			return false;
+		
+		canvas.id = "context3DCanvas"; // since we are currently using only the first Stage3D-instance.
+		canvas.style.setProperty("z-index", "1");
+		canvas.style.setProperty("position", "absolute");
+		js.Browser.document.body.appendChild(canvas);
+		//window.backend.canvas.parentNode.appendChild(canvas);
+		
+		__canvas = canvas;
+		GL.context = new GLRenderContext (cast webgl);
+		
+		window.backend.canvas.style.setProperty("z-index", "2");
+		if (__stage.color != null)
+			__stage.color = null; // make bg of canvas above transparent
+		
+		return true;
+	}
+	
+	public function adjustCanvas3dTransforms():Void
+	{
+		//__canvas.width = canvas2d.width;
+		//__canvas.height = canvas2d.height;
+		//__canvas.style.cssText = canvas2d.style.cssText;
+		//__canvas.style.setProperty("position", "relative");
+		//__canvas.style.setProperty("top", "-100%");
+		
+		var canvas2d:CanvasElement = untyped __stage.window.backend.canvas;
+		var rect = canvas2d.getBoundingClientRect();
+		var style:CSSStyleDeclaration = __canvas.style;
+		style.setProperty("left", ""+rect.left);
+		style.setProperty("top", ""+rect.top);
+		
+		__canvas.width = Std.int(rect.right - rect.left);
+		__canvas.height = Std.int(rect.bottom - rect.top);
+		
+		// See HTML5Window for original canvas2d-positioning.
+		// But this must be different (it must be exactly beneath 2d)
+		// Taking it out of flow with "position: absolute;" should be the best we could do here.
+		
+		/*
+		//style.setProperty ("-webkit-transform", "translateZ(0)", null);
+		//style.setProperty ("transform", "translateZ(0)", null);
+		var parent = Lib.current.stage.window;
+		__canvas.width = Math.round (parent.width * parent.scale);
+		__canvas.height = Math.round (parent.height * parent.scale);
+		
+		__canvas.style.width = parent.width + "px";
+		__canvas.style.height = parent.height + "px";
+		*/
+	}
+	
+	private function onStageResized(e:Event):Void 
+	{
+		if (__canvas != null) {
+			
+			adjustCanvas3dTransforms();
+			
+		}
+	}
+	
+	#end
 	
 	
 	private function __dispatchError ():Void {
@@ -224,12 +374,31 @@ class Stage3D extends EventDispatcher {
 		
 		if (!visible) return;
 		
+		#if !patch_context3d
+		
 		if (__contextRequested) {
 			
 			__dispatchError ();
 			__contextRequested = false;
 			
 		}
+		
+		#else
+		
+		if (__contextRequested && context3D == null) {
+			
+			__createContext (stage, renderer);
+			
+		}
+		
+		if (context3D != null) {
+			
+			__resetContext3DStates ();
+			//GLStage3D.render (this, cast(renderer, CanvasGLHybridRenderer).renderer3d);
+			GLStage3D.render (this, __renderer3d);
+		}
+		
+		#end
 		
 	}
 	
