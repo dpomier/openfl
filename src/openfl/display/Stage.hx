@@ -1075,7 +1075,7 @@ class Stage extends DisplayObjectContainer implements IModule {
 				
 				#if !patch_context3d
 				
-				__renderer = new CanvasRenderer (window.context.canvas2D);
+				__renderer = new CanvasRenderer (context);
 				
 				#else
 				
@@ -1085,9 +1085,12 @@ class Stage extends DisplayObjectContainer implements IModule {
 					
 					stage3Ds[0].__createContext (this, __renderer);
 					
-					cast(__renderer, CanvasGLHybridRenderer).renderer3d.__allowSmoothing = (quality != LOW);
-					cast(__renderer, CanvasGLHybridRenderer).renderer3d.__worldTransform = __displayMatrix;
-					cast(__renderer, CanvasGLHybridRenderer).renderer3d.__stage = this;
+					if (cast(__renderer, CanvasGLHybridRenderer).renderer3d != null)
+					{
+						cast(__renderer, CanvasGLHybridRenderer).renderer3d.__allowSmoothing = (quality != LOW);
+						cast(__renderer, CanvasGLHybridRenderer).renderer3d.__worldTransform = __displayMatrix;
+						cast(__renderer, CanvasGLHybridRenderer).renderer3d.__stage = this;
+					}
 				}
 				else
 					cast(__renderer, CanvasGLHybridRenderer).renderer3d = untyped stage3Ds[0].__renderer3d;

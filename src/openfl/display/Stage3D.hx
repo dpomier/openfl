@@ -276,15 +276,20 @@ class Stage3D extends EventDispatcher {
 			return false;
 		
 		canvas.id = "context3DCanvas"; // since we are currently using only the first Stage3D-instance.
-		canvas.style.setProperty("z-index", "1");
-		canvas.style.setProperty("position", "absolute");
-		js.Browser.document.body.appendChild(canvas);
-		//window.backend.canvas.parentNode.appendChild(canvas);
+		window.backend.canvas.parentNode.insertBefore(canvas, window.backend.canvas);
+		
+		__style = canvas.style;
+		__style.setProperty ("position", "absolute", null);
+		__style.setProperty ("top", "0", null);
+		__style.setProperty ("left", "0", null);
+		__style.setProperty ("-webkit-transform-origin", "0 0 0", null);
+		__style.setProperty ("transform-origin", "0 0 0", null);
+		__style.setProperty ("z-index", "0", null);
 		
 		__canvas = canvas;
 		GL.context = new GLRenderContext (cast webgl);
 		
-		window.backend.canvas.style.setProperty("z-index", "2");
+		window.backend.canvas.style.setProperty("z-index", "1");
 		if (__stage.color != null)
 			__stage.color = null; // make bg of canvas above transparent
 		
