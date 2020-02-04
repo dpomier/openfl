@@ -1,0 +1,4 @@
+# @run: haxelib run-dir lime D:/Repositories/dpomier/lime/
+-cp D:/Repositories/dpomier/lime/src/
+-D lime=7.7.0
+--macro lime._internal.macros.DefineMacro.run()
