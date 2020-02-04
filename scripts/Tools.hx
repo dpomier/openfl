@@ -58,36 +58,43 @@ class Tools
 		var command = (haxePath != null && haxePath != "") ? haxePath + "/haxelib" : "haxelib";
 		var path = "";
 
-		var process = new Process("haxelib", ["path", "lime"]);
-
-		try
+		if (Path.normalize(Sys.getCwd()).substr(-6, 6) == "/.lime")
 		{
-			while (true)
-			{
-				var line = StringTools.trim(process.stdout.readLine());
+			path = Sys.getCwd() + "/ndll/";
+		}
+		else
+		{
+			var process = new Process("haxelib path lime");
 
-				if (line.length > 0 && !StringTools.startsWith(line, "-"))
+			try
+			{
+				while (true)
 				{
-					path = StringTools.trim(line);
-					if (FileSystem.exists(Path.combine(path, "../lib")))
+					var line = StringTools.trim(process.stdout.readLine());
+
+					if (line.length > 0 && !StringTools.startsWith(line, "-"))
 					{
-						path = Path.combine(path, "../lib");
+						path = StringTools.trim(line);
+						if (FileSystem.exists(Path.combine(path, "../lib")))
+						{
+							path = Path.combine(path, "../lib");
+						}
+						else
+						{
+							path = Path.combine(path, "../ndll");
+						}
+						if (!StringTools.endsWith(path, "/"))
+						{
+							path += "/";
+						}
+						break;
 					}
-					else
-					{
-						path = Path.combine(path, "../ndll");
-					}
-					if (!StringTools.endsWith(path, "/"))
-					{
-						path += "/";
-					}
-					break;
 				}
 			}
-		}
-		catch (e:Dynamic) {}
+			catch (e:Dynamic) {}
 
-		process.close();
+			process.close();
+		}
 
 		switch (System.hostPlatform)
 		{
@@ -516,6 +523,7 @@ class Tools
 	public static function main()
 	{
 		var arguments = Sys.args();
+		var workingDirectory:String = "";
 
 		#if !nodejs
 		if (arguments.length > 0)
@@ -542,7 +550,8 @@ class Tools
 
 			if (FileSystem.exists(lastArgument) && FileSystem.isDirectory(lastArgument))
 			{
-				Sys.setCwd(lastArgument);
+				workingDirectory = lastArgument;
+				Sys.setCwd(workingDirectory);
 			}
 		}
 		#else
@@ -628,7 +637,7 @@ class Tools
 					unserializer.setResolver(cast {resolveEnum: Type.resolveEnum, resolveClass: resolveClass});
 					var project:HXProject = unserializer.unserialize();
 
-					var output = processLibraries(project);
+					var output = processLibraries(project, workingDirectory);
 
 					if (output != null)
 					{
@@ -784,7 +793,7 @@ class Tools
 		return true;
 	}
 
-	private static function processLibraries(project:HXProject):HXProject
+	private static function processLibraries(project:HXProject, workingDirectory:String):HXProject
 	{
 		// HXProject._command = project.command;
 		HXProject._debug = project.debug;
@@ -897,7 +906,7 @@ class Tools
 						if (FileSystem.exists(cacheFile))
 						{
 							var cacheDate = FileSystem.stat(cacheFile).mtime;
-							var swfToolDate = FileSystem.stat(Haxelib.getPath(new Haxelib("openfl"), true) + "/scripts/tools.n").mtime;
+							var swfToolDate = FileSystem.stat(getToolPath(workingDirectory)).mtime;
 							var sourceDate = FileSystem.stat(library.sourcePath).mtime;
 
 							if (sourceDate.getTime() < cacheDate.getTime() && swfToolDate.getTime() < cacheDate.getTime())
@@ -1202,5 +1211,17 @@ class Tools
 		}
 
 		return result;
+	}
+
+	private static function getToolPath(workingDirectory:String):String
+	{
+		if (FileSystem.exists(workingDirectory + "/.openfl") && FileSystem.isDirectory(workingDirectory + "/.openfl"))
+		{
+			return workingDirectory + "/.openfl/tools.n";
+		}
+		else
+		{
+			return Path.combine(Haxelib.getPath(new Haxelib("openfl"), true), "/scripts/tools.n");
+		}
 	}
 }
